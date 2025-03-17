@@ -7,10 +7,8 @@ import openpyxl
 
 
 bars = IN[0]
-sheet_name = IN[1]  # Change this to the correct sheet name
+sheet_name = IN[1] 
 
-
-# Place your code below this line
 bar_data = []
 for bar in bars:
     try:
@@ -30,8 +28,9 @@ for bar in bars:
 
     except Exception as e:
         bar_data.append([f"Error processing bar {bar.Id}", str(e)])
+        
 # Define file path
-excel_file = r"C:\Users\BCS\BSSE\BSS BIM - Documents\DYNAMO TRIAL\TowerToRobot_B.xlsx"
+excel_file = r"C:\Documents\DYNAMO TRIAL\TowerToRobot_B.xlsx"
 
 # Column headers
 headers = ["Bar ID", "Start Node ID", "Start X", "Start Y", "Start Z", "End Node ID", "End X", "End Y", "End Z"]
@@ -61,7 +60,7 @@ new_hash = compute_data_hash(bar_data)
 
 # Check if data has changed
 if new_hash != previous_hash:
-    print("🔄 Changes detected: Updating Excel file...")
+    print("Changes detected: Updating Excel file...")
 
     # If file exists, clear the sheet before writing
     if os.path.exists(excel_file):
@@ -86,10 +85,7 @@ if new_hash != previous_hash:
 
     # Save the updated file
     workbook.save(excel_file)
-    print(f"✅ Excel file updated: {excel_file}")
+    OUT = f"Excel file updated: {excel_file}"
 
 else:
-    print("✅ No changes detected: Excel file remains unchanged.")
-
-# Output file path for Dynamo
-OUT = excel_file
+    OUT = "No changes detected: Excel file remains unchanged."
