@@ -1,0 +1,342 @@
+{
+  "Uuid": "d9839aea-5184-40c3-8da0-12b8fbedfc3b",
+  "IsCustomNode": false,
+  "Description": "",
+  "Name": "UpdateFamilyTypes",
+  "ElementResolver": {
+    "ResolutionMap": {}
+  },
+  "Inputs": [],
+  "Outputs": [],
+  "Nodes": [
+    {
+      "ConcreteType": "PythonNodeModels.PythonNode, PythonNodeModels",
+      "Code": "import clr\r\nclr.AddReference('RevitServices')\r\nclr.AddReference('RevitNodes')\r\nclr.AddReference('RevitAPI')\r\n\r\nfrom RevitServices.Persistence import DocumentManager\r\nfrom RevitServices.Transactions import TransactionManager\r\nfrom Autodesk.Revit.DB import *\r\nif IN[1]:\r\n    # Get the current document (Family Document)\r\n    doc = DocumentManager.Instance.CurrentDBDocument\r\n    \r\n    # Ensure we are inside a Family Document\r\n    if not doc.IsFamilyDocument:\r\n        raise Exception(\"Please run this script inside a Family document in Revit.\")\r\n    \r\n    # Get input from Dynamo (List of values from Excel)\r\n    typeList = IN[0]  # List format [[\"Type\", L, W, H], ...]\r\n    \r\n    # Conversion factor from mm to feet\r\n    MM_TO_FEET = 0.00328084\r\n    \r\n    # Start a Transaction\r\n    TransactionManager.Instance.EnsureInTransaction(doc)\r\n    \r\n    # Get Family Manager\r\n    fam_mgr = doc.FamilyManager\r\n    existing_types = {t.Name: t for t in fam_mgr.Types}  # Store type names with their references\r\n    \r\n    # Retrieve Family Parameters\r\n    param_L = fam_mgr.get_Parameter(\"L\")\r\n    param_W = fam_mgr.get_Parameter(\"W\")\r\n    param_H = fam_mgr.get_Parameter(\"H\")\r\n    \r\n    if not param_L or not param_W or not param_H:\r\n        raise Exception(\"Parameters 'L', 'W', or 'H' not found in the Family.\")\r\n    \r\n    # Read data and create or update family types\r\n    for ins in typeList[1:]:  # Skip headers\r\n        type_name = ins[0]\r\n        length = ins[1] * MM_TO_FEET  # Convert mm to feet\r\n        width = ins[2] * MM_TO_FEET   # Convert mm to feet\r\n        height = ins[3] * MM_TO_FEET  # Convert mm to feet\r\n    \r\n        if type_name in existing_types:\r\n            # If type exists, switch to it and update values\r\n            fam_mgr.CurrentType = existing_types[type_name]\r\n        else:\r\n            # If type does not exist, create it\r\n            new_type = fam_mgr.NewType(type_name)\r\n            existing_types[type_name] = new_type\r\n    \r\n        # Set parameter values\r\n        fam_mgr.Set(param_L, length)\r\n        fam_mgr.Set(param_W, width)\r\n        fam_mgr.Set(param_H, height)\r\n    \r\n    # Commit transaction\r\n    TransactionManager.Instance.TransactionTaskDone()\r\n    \r\n    # Output success message\r\n    OUT = \"Family types created/updated successfully!\"\r\n",
+      "Engine": "CPython3",
+      "EngineName": "CPython3",
+      "VariableInputPorts": true,
+      "Id": "91958328b41042c187281060075a064e",
+      "NodeType": "PythonScriptNode",
+      "Inputs": [
+        {
+          "Id": "a98ed2a1136845aeb2c9c0ddf6f7e789",
+          "Name": "IN[0]",
+          "Description": "Input #0",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        },
+        {
+          "Id": "7c0cb10034914827ab30d932d0c13b5a",
+          "Name": "IN[1]",
+          "Description": "Input #1",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        }
+      ],
+      "Outputs": [
+        {
+          "Id": "722488a5e8f1444599707fe6ce629762",
+          "Name": "OUT",
+          "Description": "Result of the python script",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        }
+      ],
+      "Replication": "Disabled",
+      "Description": "Runs an embedded Python script."
+    },
+    {
+      "ConcreteType": "CoreNodeModels.Input.Filename, CoreNodeModels",
+      "Id": "0e6e5c2a92d24d519fd57915d8fbf164",
+      "NodeType": "ExtensionNode",
+      "Inputs": [],
+      "Outputs": [
+        {
+          "Id": "35d2dfb106e5403c894a02132130aec3",
+          "Name": "",
+          "Description": "File Path",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        }
+      ],
+      "Replication": "Disabled",
+      "Description": "Allows you to select a file on the system and returns its file path",
+      "HintPath": "C:\\Users\\BCS\\Desktop\\Working\\Book2.xlsx",
+      "InputValue": "C:\\Users\\BCS\\Desktop\\Working\\Book2.xlsx"
+    },
+    {
+      "ConcreteType": "PythonNodeModels.PythonNode, PythonNodeModels",
+      "Code": "import clr\r\nimport openpyxl\r\n\r\n# Inputs from Dynamo\r\nexcel_file = IN[0]  \r\nsheet_name = IN[1]  \r\nif IN[2]:    \r\n    try:\r\n        # Load the Excel workbook\r\n        workbook = openpyxl.load_workbook(excel_file, data_only=True)  # data_only=True reads cell values (not formulas)\r\n        \r\n        # Check if sheet exists\r\n        if sheet_name not in workbook.sheetnames:\r\n            OUT = f\" Error: Sheet '{sheet_name}' not found in the file.\"\r\n        else:\r\n            sheet = workbook[sheet_name]  # Get the specified sheet\r\n    \r\n            # Extract all rows and columns into a list of lists\r\n            excel_data = []\r\n            for row in sheet.iter_rows(values_only=True):\r\n                excel_data.append([cell if cell is not None else None for cell in row])  # Replace empty cells with None\r\n    \r\n            # Output the extracted data\r\n            OUT = excel_data\r\n    \r\n    except Exception as e:\r\n        OUT = f\"Error: {e}\"",
+      "Engine": "CPython3",
+      "EngineName": "CPython3",
+      "VariableInputPorts": true,
+      "Id": "132c41c03fad40ea802a90acc0a4caa1",
+      "NodeType": "PythonScriptNode",
+      "Inputs": [
+        {
+          "Id": "f6ba77664bb74e1caeded62fd2b96848",
+          "Name": "IN[0]",
+          "Description": "Input #0",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        },
+        {
+          "Id": "1b02e678fc564a818d7c529e640a9e42",
+          "Name": "IN[1]",
+          "Description": "Input #1",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        },
+        {
+          "Id": "03c7de15f3494f44bd91c8acaeb6c961",
+          "Name": "IN[2]",
+          "Description": "Input #2",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        }
+      ],
+      "Outputs": [
+        {
+          "Id": "4bb4233d32e040e881813834f40658fe",
+          "Name": "OUT",
+          "Description": "Result of the python script",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        }
+      ],
+      "Replication": "Disabled",
+      "Description": "Runs an embedded Python script."
+    },
+    {
+      "ConcreteType": "CoreNodeModels.Input.StringInput, CoreNodeModels",
+      "Id": "47cc77868afc4a5ab6a45c3582169014",
+      "NodeType": "StringInputNode",
+      "Inputs": [],
+      "Outputs": [
+        {
+          "Id": "0bd8ce79a2074c90a20b33da9e27c06d",
+          "Name": "",
+          "Description": "String",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        }
+      ],
+      "Replication": "Disabled",
+      "Description": "Creates a string",
+      "InputValue": "Sheet1"
+    },
+    {
+      "ConcreteType": "CoreNodeModels.Input.BoolSelector, CoreNodeModels",
+      "Id": "7633582928d4480caae0123457188fe2",
+      "NodeType": "BooleanInputNode",
+      "Inputs": [],
+      "Outputs": [
+        {
+          "Id": "3a35e783c5c44252b58dc2710359f7b9",
+          "Name": "",
+          "Description": "Boolean",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        }
+      ],
+      "Replication": "Disabled",
+      "Description": "Enables selection between True and False",
+      "InputValue": true
+    },
+    {
+      "ConcreteType": "CoreNodeModels.Input.BoolSelector, CoreNodeModels",
+      "Id": "45db64227fa6415fb8002a1be94e70a2",
+      "NodeType": "BooleanInputNode",
+      "Inputs": [],
+      "Outputs": [
+        {
+          "Id": "66d47f1d7f5c48dea0cdc05a5e01dc5e",
+          "Name": "",
+          "Description": "Boolean",
+          "UsingDefaultValue": false,
+          "Level": 2,
+          "UseLevels": false,
+          "KeepListStructure": false
+        }
+      ],
+      "Replication": "Disabled",
+      "Description": "Enables selection between True and False",
+      "InputValue": true
+    }
+  ],
+  "Connectors": [
+    {
+      "Start": "35d2dfb106e5403c894a02132130aec3",
+      "End": "f6ba77664bb74e1caeded62fd2b96848",
+      "Id": "450ecba5b33b49cf9e2bc0e6a0ad8568",
+      "IsHidden": "False"
+    },
+    {
+      "Start": "4bb4233d32e040e881813834f40658fe",
+      "End": "a98ed2a1136845aeb2c9c0ddf6f7e789",
+      "Id": "19ebcd5396d741c984b40d5e503e7669",
+      "IsHidden": "False"
+    },
+    {
+      "Start": "0bd8ce79a2074c90a20b33da9e27c06d",
+      "End": "1b02e678fc564a818d7c529e640a9e42",
+      "Id": "472b985d89404913ba45558ff2759647",
+      "IsHidden": "False"
+    },
+    {
+      "Start": "3a35e783c5c44252b58dc2710359f7b9",
+      "End": "7c0cb10034914827ab30d932d0c13b5a",
+      "Id": "52a7c995b9034f49aba615c3751f58f3",
+      "IsHidden": "False"
+    },
+    {
+      "Start": "66d47f1d7f5c48dea0cdc05a5e01dc5e",
+      "End": "03c7de15f3494f44bd91c8acaeb6c961",
+      "Id": "75e71ec237024f5abf04153c59f2dcaf",
+      "IsHidden": "False"
+    }
+  ],
+  "Dependencies": [],
+  "NodeLibraryDependencies": [
+    {
+      "Name": "Book2.xlsx",
+      "ReferenceType": "External",
+      "Nodes": [
+        "0e6e5c2a92d24d519fd57915d8fbf164"
+      ]
+    }
+  ],
+  "Thumbnail": "",
+  "GraphDocumentationURL": null,
+  "ExtensionWorkspaceData": [
+    {
+      "ExtensionGuid": "28992e1d-abb9-417f-8b1b-05e053bee670",
+      "Name": "Properties",
+      "Version": "2.19",
+      "Data": {}
+    },
+    {
+      "ExtensionGuid": "DFBD9CC0-DB40-457A-939E-8C8555555A9D",
+      "Name": "Generative Design",
+      "Version": "6.1",
+      "Data": {}
+    }
+  ],
+  "Author": "",
+  "Linting": {
+    "activeLinter": "None",
+    "activeLinterId": "7b75fb44-43fd-4631-a878-29f4d5d8399a",
+    "warningCount": 0,
+    "errorCount": 0
+  },
+  "Bindings": [],
+  "View": {
+    "Dynamo": {
+      "ScaleFactor": 1.0,
+      "HasRunWithoutCrash": true,
+      "IsVisibleInDynamoLibrary": true,
+      "Version": "2.19.3.6394",
+      "RunType": "Manual",
+      "RunPeriod": "1000"
+    },
+    "Camera": {
+      "Name": "_Background Preview",
+      "EyeX": -17.0,
+      "EyeY": 24.0,
+      "EyeZ": 50.0,
+      "LookX": 12.0,
+      "LookY": -13.0,
+      "LookZ": -58.0,
+      "UpX": 0.0,
+      "UpY": 1.0,
+      "UpZ": 0.0
+    },
+    "ConnectorPins": [],
+    "NodeViews": [
+      {
+        "Id": "91958328b41042c187281060075a064e",
+        "Name": "Python Script",
+        "IsSetAsInput": false,
+        "IsSetAsOutput": false,
+        "Excluded": false,
+        "ShowGeometry": true,
+        "X": 1016.5920561576468,
+        "Y": 153.00514557436134
+      },
+      {
+        "Id": "0e6e5c2a92d24d519fd57915d8fbf164",
+        "Name": "File Path",
+        "IsSetAsInput": false,
+        "IsSetAsOutput": false,
+        "Excluded": false,
+        "ShowGeometry": true,
+        "X": 88.768567813239827,
+        "Y": 179.77478024577417
+      },
+      {
+        "Id": "132c41c03fad40ea802a90acc0a4caa1",
+        "Name": "Python Script",
+        "IsSetAsInput": false,
+        "IsSetAsOutput": false,
+        "Excluded": false,
+        "ShowGeometry": true,
+        "X": 476.23997089884733,
+        "Y": 252.81366114882798
+      },
+      {
+        "Id": "47cc77868afc4a5ab6a45c3582169014",
+        "Name": "String",
+        "IsSetAsInput": false,
+        "IsSetAsOutput": false,
+        "Excluded": false,
+        "ShowGeometry": true,
+        "X": 131.72812378377716,
+        "Y": 320.65239022611826
+      },
+      {
+        "Id": "7633582928d4480caae0123457188fe2",
+        "Name": "Boolean",
+        "IsSetAsInput": false,
+        "IsSetAsOutput": false,
+        "Excluded": false,
+        "ShowGeometry": true,
+        "X": 757.60123680694687,
+        "Y": 322.49153984919747
+      },
+      {
+        "Id": "45db64227fa6415fb8002a1be94e70a2",
+        "Name": "Boolean",
+        "IsSetAsInput": false,
+        "IsSetAsOutput": false,
+        "Excluded": false,
+        "ShowGeometry": true,
+        "X": 108.56010971516105,
+        "Y": 490.47465640765063
+      }
+    ],
+    "Annotations": [],
+    "X": -2.7707891749780629,
+    "Y": 114.84232573803683,
+    "Zoom": 0.77051684820224564
+  }
+}
